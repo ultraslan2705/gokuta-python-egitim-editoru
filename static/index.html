@@ -130,39 +130,6 @@
         line-height: 1.4;
       }
 
-      .stdin-wrap {
-        border: 1px solid #d8e3ef;
-        border-radius: 10px;
-        background: #f8fbff;
-        padding: 8px 10px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .stdin-wrap[hidden] {
-        display: none;
-      }
-
-      .stdin-label {
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: #2a4a63;
-        white-space: nowrap;
-      }
-
-      #stdin {
-        width: 100%;
-        height: 38px;
-        border: 1px solid #d2deec;
-        border-radius: 10px;
-        padding: 0 10px;
-        resize: none;
-        font-family: "Courier New", Courier, monospace;
-        font-size: 0.95rem;
-        background: #ffffff;
-      }
-
       #code {
         position: absolute;
         inset: 0;
@@ -388,20 +355,6 @@
           font-size: 0.84rem;
         }
 
-        .stdin-wrap {
-          padding: 6px 8px;
-        }
-
-        .stdin-label {
-          font-size: 0.74rem;
-        }
-
-        #stdin {
-          height: 32px;
-          padding: 0 8px;
-          font-size: 0.8rem;
-        }
-
         .actions {
           gap: 6px;
         }
@@ -458,10 +411,6 @@ print("Gökçe KIRCALI")
         <h2>Çıktı</h2>
         <div class="output-body">
           <pre id="output">Sonuç burada görünecek.</pre>
-          <div id="stdin-wrap" class="stdin-wrap" hidden>
-            <label class="stdin-label" for="stdin">Veri girişi</label>
-            <input id="stdin" type="text" spellcheck="false" placeholder="0" />
-          </div>
           <div class="actions">
             <button id="clear-output" type="button">Temizle</button>
           </div>
@@ -471,8 +420,6 @@ print("Gökçe KIRCALI")
 
     <script>
       const codeInput = document.getElementById("code");
-      const stdinWrap = document.getElementById("stdin-wrap");
-      const stdinInput = document.getElementById("stdin");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
       const clearCodeButton = document.getElementById("clear-code");
@@ -534,9 +481,26 @@ print("Gökçe KIRCALI")
         syncEditorScroll();
       }
 
-      function syncStdinVisibility() {
-        const hasInputCall = /\binput\s*\(/.test(codeInput.value);
-        stdinWrap.hidden = !hasInputCall;
+      function extractInputPrompts(source) {
+        const prompts = [];
+        const regex = /\binput\s*\(\s*(?:(["'])(.*?)\1)?\s*\)/g;
+        let match;
+        while ((match = regex.exec(source)) !== null) {
+          const rawPrompt = (match[2] || "").replace(/\\n/g, "\n").trim();
+          prompts.push(rawPrompt || "Bir değer giriniz:");
+        }
+        return prompts;
+      }
+
+      function collectStdinFromPrompts(prompts) {
+        if (prompts.length === 0) return "";
+        const values = [];
+        for (const prompt of prompts) {
+          const answer = window.prompt(prompt, "0");
+          if (answer === null) return null;
+          values.push(answer.trim() === "" ? "0" : answer);
+        }
+        return `${values.join("\n")}\n`;
       }
 
       async function runCode() {
@@ -546,11 +510,20 @@ print("Gökçe KIRCALI")
         output.textContent = "Kod çalıştırılıyor...";
 
         try {
-          const stdinValue = stdinInput.value.trim();
+          const prompts = extractInputPrompts(code);
+          const stdin = collectStdinFromPrompts(prompts);
+          if (stdin === null) {
+            output.textContent = "Çalıştırma iptal edildi.";
+            return;
+          }
           const response = await fetch("/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, stdin: stdinValue ? `${stdinValue}\n` : "" }),
+            body: JSON.stringify({
+              code,
+              stdin,
+              strip_input_prompts: prompts.length > 0,
+            }),
           });
 
           const data = await response.json();
@@ -579,7 +552,6 @@ print("Gökçe KIRCALI")
       runButton.addEventListener("click", runCode);
       codeInput.addEventListener("input", () => {
         renderHighlighting();
-        syncStdinVisibility();
       });
       codeInput.addEventListener("scroll", syncEditorScroll);
       if (isCoarsePointer) {
@@ -603,9 +575,7 @@ print("Gökçe KIRCALI")
       });
       clearCodeButton.addEventListener("click", () => {
         codeInput.value = "";
-        stdinInput.value = "";
         renderHighlighting();
-        syncStdinVisibility();
         codeInput.focus();
       });
       clearOutputButton.addEventListener("click", () => {
@@ -614,7 +584,6 @@ print("Gökçe KIRCALI")
       });
       codeInput.value = codeInput.value.replace(/^\n/, "").replace(/\n\s*$/, "");
       renderHighlighting();
-      syncStdinVisibility();
     </script>
   </body>
 </html>

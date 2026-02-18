@@ -130,6 +130,13 @@ def _normalize_inline_input_prompts(code: str, stdout: str) -> str:
     return normalized
 
 
+def _strip_input_prompts_from_stdout(code: str, stdout: str) -> str:
+    cleaned = stdout
+    for prompt in _extract_literal_input_prompts(code):
+        cleaned = cleaned.replace(prompt, "")
+    return cleaned
+
+
 class SlidingWindowRateLimiter:
     def __init__(self, max_requests: int, window_seconds: int) -> None:
         self.max_requests = max(1, max_requests)
@@ -221,7 +228,9 @@ def _build_error_message_tr(stderr: str) -> str:
     return _trim("\n".join(lines))
 
 
-def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
+def run_python(
+    code: str, stdin_data: str = "", strip_input_prompts: bool = False
+) -> dict[str, str | bool]:
     stdin_value = _normalized_stdin(code, stdin_data)
 
     try:
@@ -246,7 +255,10 @@ def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
         }
 
     stdout_raw = completed.stdout.strip()
-    stdout_raw = _normalize_inline_input_prompts(code, stdout_raw).strip()
+    if strip_input_prompts:
+        stdout_raw = _strip_input_prompts_from_stdout(code, stdout_raw).strip()
+    else:
+        stdout_raw = _normalize_inline_input_prompts(code, stdout_raw).strip()
     stderr_raw = completed.stderr.strip()
     stdout = _trim(stdout_raw)
 
@@ -348,6 +360,7 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
 
         code = payload.get("code", "")
         stdin_data = payload.get("stdin", "")
+        strip_input_prompts = payload.get("strip_input_prompts", False)
         if not isinstance(code, str):
             self._send_json(
                 400,
@@ -360,6 +373,16 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
                 {"ok": False, "output": "", "error": "`stdin` metin (string) olmalı."},
             )
             return
+        if not isinstance(strip_input_prompts, bool):
+            self._send_json(
+                400,
+                {
+                    "ok": False,
+                    "output": "",
+                    "error": "`strip_input_prompts` true/false olmalı.",
+                },
+            )
+            return
 
         if not code.strip():
             self._send_json(
@@ -367,7 +390,12 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             )
             return
 
-        self._send_json(200, run_python(code, stdin_data=stdin_data))
+        self._send_json(
+            200,
+            run_python(
+                code, stdin_data=stdin_data, strip_input_prompts=strip_input_prompts
+            ),
+        )
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
