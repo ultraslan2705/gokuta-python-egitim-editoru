@@ -47,5 +47,16 @@ Bu uygulama eğitim amaçlıdır ve sunucuya gönderilen Python kodunu çalışt
 İnternete açacaksan en azından şunları ekle:
 
 - basit giriş şifresi (öğretmen/öğrenci erişimi),
-- istek başına süre ve çıktı limiti (zaten var),
+- istek başına süre, çıktı limiti ve temel rate limit (zaten var),
 - günlük istek limiti (rate limit).
+
+Varsayılan rate limit:
+
+- `RATE_LIMIT_MAX_REQUESTS=120`
+- `RATE_LIMIT_WINDOW_SECONDS=60`
+
+İstersen sunucuyu farklı bir limit ile başlatabilirsin:
+
+```bash
+RATE_LIMIT_MAX_REQUESTS=180 RATE_LIMIT_WINDOW_SECONDS=60 python3 server.py
+```

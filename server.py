@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 import json
 import os
 import re
 import subprocess
 import sys
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -24,6 +27,8 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = _env_int("PORT", 8000)
 EXEC_TIMEOUT_SECONDS = 3
 MAX_OUTPUT_CHARS = 12_000
+RATE_LIMIT_WINDOW_SECONDS = _env_int("RATE_LIMIT_WINDOW_SECONDS", 60)
+RATE_LIMIT_MAX_REQUESTS = _env_int("RATE_LIMIT_MAX_REQUESTS", 120)
 
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "static" / "index.html"
@@ -65,6 +70,36 @@ def _trim(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
         return text
     return text[:MAX_OUTPUT_CHARS] + "\n\n... [çıktı kısaltıldı]"
+
+
+class SlidingWindowRateLimiter:
+    def __init__(self, max_requests: int, window_seconds: int) -> None:
+        self.max_requests = max(1, max_requests)
+        self.window_seconds = max(1, window_seconds)
+        self._events: defaultdict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> tuple[bool, int]:
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+
+        with self._lock:
+            bucket = self._events[key]
+            while bucket and bucket[0] <= cutoff:
+                bucket.popleft()
+
+            if len(bucket) >= self.max_requests:
+                retry_after = max(1, int(self.window_seconds - (now - bucket[0])))
+                return False, retry_after
+
+            bucket.append(now)
+            return True, 0
+
+
+RATE_LIMITER = SlidingWindowRateLimiter(
+    max_requests=RATE_LIMIT_MAX_REQUESTS,
+    window_seconds=RATE_LIMIT_WINDOW_SECONDS,
+)
 
 
 def _extract_exception_info(stderr: str) -> tuple[str | None, str]:
@@ -168,13 +203,29 @@ def run_python(code: str) -> dict[str, str | bool]:
 
 
 class PlaygroundHandler(BaseHTTPRequestHandler):
-    def _send_json(self, status: int, payload: dict[str, str | bool]) -> None:
+    def _send_json(
+        self,
+        status: int,
+        payload: dict[str, str | bool],
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        if extra_headers:
+            for name, value in extra_headers.items():
+                self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
+
+    def _get_client_ip(self) -> str:
+        forwarded = self.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            first = forwarded.split(",")[0].strip()
+            if first:
+                return first
+        return self.client_address[0]
 
     def _send_html(self) -> None:
         if not INDEX_FILE.exists():
@@ -199,6 +250,19 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path != "/run":
             self.send_error(404, "Endpoint bulunamadı.")
+            return
+
+        allowed, retry_after = RATE_LIMITER.allow(self._get_client_ip())
+        if not allowed:
+            self._send_json(
+                429,
+                {
+                    "ok": False,
+                    "output": "",
+                    "error": f"Çok sık istek gönderildi. {retry_after} saniye sonra tekrar dene.",
+                },
+                extra_headers={"Retry-After": str(retry_after)},
+            )
             return
 
         try:
