@@ -519,11 +519,7 @@ print("Gökçe KIRCALI")
           const response = await fetch("/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code,
-              stdin,
-              strip_input_prompts: prompts.length > 0,
-            }),
+            body: JSON.stringify({ code, stdin }),
           });
 
           const data = await response.json();
