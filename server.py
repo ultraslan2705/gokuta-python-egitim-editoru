@@ -1,0 +1,258 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = _env_int("PORT", 8000)
+EXEC_TIMEOUT_SECONDS = 3
+MAX_OUTPUT_CHARS = 12_000
+
+BASE_DIR = Path(__file__).resolve().parent
+INDEX_FILE = BASE_DIR / "static" / "index.html"
+
+ERROR_HINTS_TR = {
+    "SyntaxError": "Yazım hatası var. Komutun yapısını tekrar kontrol et.",
+    "IndentationError": "Girinti hatası var. Aynı bloktaki satırlar eşit boşlukla başlamalı.",
+    "TabError": "Sekme ve boşluk karışmış. Girintide tek bir yöntem kullan.",
+    "NameError": "Tanımlanmamış bir isim kullandın.",
+    "TypeError": "Veri türleri bu işlem için uyumlu değil.",
+    "ValueError": "Fonksiyona uygun olmayan bir değer gönderildi.",
+    "ZeroDivisionError": "Sıfıra bölme yapılamaz.",
+    "IndexError": "Listenin olmayan bir indeksine erişilmeye çalışıldı.",
+    "KeyError": "Sözlükte olmayan bir anahtar kullanıldı.",
+    "AttributeError": "Bu nesnede istenen özellik veya metot yok.",
+    "ModuleNotFoundError": "İstenen modül bulunamadı.",
+}
+
+DETAIL_PHRASES_TR = (
+    ("invalid syntax", "geçersiz söz dizimi"),
+    ("unexpected EOF while parsing", "kod beklenmeden bitti (parantez/tırnak eksik olabilir)"),
+    ("unterminated string literal", "tırnak kapanmadan metin bitti"),
+    ("expected ':'", "':' bekleniyor"),
+    ("expected an indented block", "girintili bir blok bekleniyor"),
+    ("unexpected indent", "beklenmeyen girinti"),
+    (
+        "unindent does not match any outer indentation level",
+        "girinti seviyesi dış bloklarla eşleşmiyor",
+    ),
+    ("division by zero", "sıfıra bölme"),
+    ("list index out of range", "liste indeksi aralık dışında"),
+    ("object is not callable", "nesne fonksiyon gibi çağrılamaz"),
+    ("unsupported operand type(s)", "desteklenmeyen işlem türü"),
+    ("No module named", "modül bulunamadı"),
+)
+
+
+def _trim(text: str) -> str:
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    return text[:MAX_OUTPUT_CHARS] + "\n\n... [çıktı kısaltıldı]"
+
+
+def _extract_exception_info(stderr: str) -> tuple[str | None, str]:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    for line in reversed(lines):
+        match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)(?::\s*(.*))?$", line)
+        if match:
+            return match.group(1), (match.group(2) or "").strip()
+    return None, ""
+
+
+def _extract_line_no(stderr: str) -> int | None:
+    matches = re.findall(r'File "<string>", line (\d+)', stderr)
+    if not matches:
+        return None
+    return int(matches[-1])
+
+
+def _translate_detail_tr(exc_type: str, detail: str) -> str:
+    if not detail:
+        return ""
+
+    if exc_type == "NameError":
+        match = re.search(r"name '(.+?)' is not defined", detail)
+        if match:
+            return f"`{match.group(1)}` adı tanımlı değil."
+
+    if exc_type == "ModuleNotFoundError":
+        match = re.search(r"No module named '(.+?)'", detail)
+        if match:
+            return f"`{match.group(1)}` modülü bulunamadı."
+
+    if exc_type == "KeyError":
+        match = re.match(r"'(.+?)'", detail)
+        if match:
+            return f"`{match.group(1)}` anahtarı sözlükte yok."
+
+    translated = detail
+    for src, dst in DETAIL_PHRASES_TR:
+        translated = translated.replace(src, dst)
+    return translated
+
+
+def _build_error_message_tr(stderr: str) -> str:
+    exc_type, detail = _extract_exception_info(stderr)
+    if not exc_type:
+        return _trim(stderr.strip()) if stderr.strip() else "Kod çalıştırılırken bir hata oluştu."
+
+    line_no = _extract_line_no(stderr)
+    hint = ERROR_HINTS_TR.get(exc_type, f"{exc_type} hatası oluştu.")
+    translated_detail = _translate_detail_tr(exc_type, detail)
+    original_line = f"{exc_type}: {detail}" if detail else exc_type
+
+    lines = [hint]
+    if line_no is not None:
+        lines.append(f"Hata satırı: {line_no}")
+    if translated_detail:
+        lines.append(f"Detay: {translated_detail}")
+    lines.append(f"Orijinal mesaj: {original_line}")
+
+    return _trim("\n".join(lines))
+
+
+def run_python(code: str) -> dict[str, str | bool]:
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-I", "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=EXEC_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "ok": False,
+            "output": "",
+            "error": "Kod zaman aşımına uğradı (3 saniye). Sonsuz döngü olabilir.",
+        }
+    except Exception as exc:  # pragma: no cover
+        return {
+            "ok": False,
+            "output": "",
+            "error": f"Beklenmeyen bir hata oluştu: {exc}",
+        }
+
+    stdout_raw = completed.stdout.strip()
+    stderr_raw = completed.stderr.strip()
+    stdout = _trim(stdout_raw)
+
+    if completed.returncode == 0:
+        return {
+            "ok": True,
+            "output": stdout if stdout else "(Çıktı yok)",
+            "error": "",
+        }
+
+    return {
+        "ok": False,
+        "output": stdout,
+        "error": _build_error_message_tr(stderr_raw),
+    }
+
+
+class PlaygroundHandler(BaseHTTPRequestHandler):
+    def _send_json(self, status: int, payload: dict[str, str | bool]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_html(self) -> None:
+        if not INDEX_FILE.exists():
+            self.send_error(500, "index.html bulunamadı.")
+            return
+
+        body = INDEX_FILE.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path == "/":
+            self._send_html()
+            return
+        self.send_error(404, "Sayfa bulunamadı.")
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if parsed.path != "/run":
+            self.send_error(404, "Endpoint bulunamadı.")
+            return
+
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self._send_json(400, {"ok": False, "output": "", "error": "Geçersiz istek."})
+            return
+
+        if length <= 0:
+            self._send_json(400, {"ok": False, "output": "", "error": "Boş istek."})
+            return
+
+        raw = self.rfile.read(min(length, 100_000))
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError:
+            self._send_json(
+                400, {"ok": False, "output": "", "error": "JSON formatı hatalı."}
+            )
+            return
+
+        code = payload.get("code", "")
+        if not isinstance(code, str):
+            self._send_json(
+                400,
+                {"ok": False, "output": "", "error": "`code` metin (string) olmalı."},
+            )
+            return
+
+        if not code.strip():
+            self._send_json(
+                400, {"ok": False, "output": "", "error": "Kod alanı boş olamaz."}
+            )
+            return
+
+        self._send_json(200, run_python(code))
+
+    def log_message(self, _format: str, *_args: object) -> None:
+        return
+
+
+def main() -> None:
+    server = ThreadingHTTPServer((HOST, PORT), PlaygroundHandler)
+    display_host = "127.0.0.1" if HOST == "0.0.0.0" else HOST
+    print(f"Sunucu hazır: http://{display_host}:{PORT}")
+    print("Durdurmak için Ctrl+C")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        print("\nSunucu kapatıldı.")
+
+
+if __name__ == "__main__":
+    main()
