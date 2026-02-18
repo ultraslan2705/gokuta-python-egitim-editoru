@@ -79,6 +79,7 @@
         width: min(1100px, calc(100% - 28px));
         margin: 0 auto 16px auto;
         min-height: calc(100vh - 132px);
+        min-height: calc(100dvh - 132px);
         display: grid;
         grid-template-rows: minmax(320px, 1fr) minmax(250px, 1fr);
         gap: 14px;
@@ -127,6 +128,33 @@
         font-size: 0.95rem;
         color: var(--muted);
         line-height: 1.4;
+      }
+
+      .stdin-wrap {
+        border: 1px solid #d8e3ef;
+        border-radius: 10px;
+        background: #f8fbff;
+        padding: 8px 10px;
+      }
+
+      .stdin-wrap summary {
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #2a4a63;
+      }
+
+      #stdin {
+        width: 100%;
+        min-height: 66px;
+        margin-top: 8px;
+        border: 1px solid #d2deec;
+        border-radius: 10px;
+        padding: 8px 10px;
+        resize: vertical;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.9rem;
+        background: #ffffff;
       }
 
       #code {
@@ -290,28 +318,86 @@
       }
 
       @media (max-width: 760px) {
+        body {
+          overflow: hidden;
+        }
+
         .app-header {
           width: calc(100% - 24px);
-          padding: 16px 0 6px;
+          padding: 10px 0 4px;
+        }
+
+        .app-kicker {
+          margin-bottom: 4px;
+          font-size: 0.62rem;
+          letter-spacing: 0.1em;
         }
 
         .app-title {
-          font-size: clamp(1.35rem, 6.7vw, 1.7rem);
+          font-size: clamp(1.16rem, 6vw, 1.42rem);
         }
 
         .layout {
           width: calc(100% - 24px);
-          grid-template-rows: auto auto;
-          min-height: auto;
+          margin: 0 auto 8px auto;
+          min-height: calc(100dvh - 82px);
+          height: calc(100dvh - 82px);
+          grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 8px;
         }
 
         .panel {
-          padding: 12px;
+          border-radius: 14px;
+          padding: 10px;
+        }
+
+        .panel h2 {
+          font-size: 0.92rem;
+        }
+
+        .hint {
+          margin-top: 4px;
+          font-size: 0.82rem;
+          line-height: 1.3;
         }
 
         .code-editor,
         #output {
-          min-height: 280px;
+          min-height: 0;
+        }
+
+        #code,
+        #highlighting,
+        #output {
+          padding: 9px;
+          font-size: 0.84rem;
+        }
+
+        .stdin-wrap {
+          padding: 6px 8px;
+        }
+
+        .stdin-wrap summary {
+          font-size: 0.76rem;
+        }
+
+        #stdin {
+          min-height: 52px;
+          max-height: 84px;
+          margin-top: 6px;
+          padding: 6px 8px;
+          font-size: 0.8rem;
+        }
+
+        .actions {
+          gap: 6px;
+        }
+
+        #run,
+        #clear-output {
+          border-radius: 10px;
+          padding: 6px 11px;
+          font-size: 0.8rem;
         }
       }
     </style>
@@ -332,6 +418,14 @@
 print("Gökçe KIRCALI")
             </textarea>
           </div>
+          <details class="stdin-wrap">
+            <summary>input() için girdi (opsiyonel)</summary>
+            <textarea
+              id="stdin"
+              spellcheck="false"
+              placeholder="Her input() için bir satır gir.&#10;Örnek:&#10;12&#10;Ali"
+            ></textarea>
+          </details>
           <div class="actions">
             <button id="run" type="button">Çalıştır</button>
           </div>
@@ -351,6 +445,7 @@ print("Gökçe KIRCALI")
 
     <script>
       const codeInput = document.getElementById("code");
+      const stdinInput = document.getElementById("stdin");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
       const runButton = document.getElementById("run");
@@ -420,7 +515,7 @@ print("Gökçe KIRCALI")
           const response = await fetch("/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code }),
+            body: JSON.stringify({ code, stdin: stdinInput.value }),
           });
 
           const data = await response.json();

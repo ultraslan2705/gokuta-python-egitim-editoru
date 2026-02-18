@@ -45,6 +45,7 @@ ERROR_HINTS_TR = {
     "KeyError": "Sözlükte olmayan bir anahtar kullanıldı.",
     "AttributeError": "Bu nesnede istenen özellik veya metot yok.",
     "ModuleNotFoundError": "İstenen modül bulunamadı.",
+    "EOFError": "input() verisi eksik görünüyor. Girdi kutusuna satır ekleyip tekrar dene.",
 }
 
 DETAIL_PHRASES_TR = (
@@ -63,6 +64,7 @@ DETAIL_PHRASES_TR = (
     ("object is not callable", "nesne fonksiyon gibi çağrılamaz"),
     ("unsupported operand type(s)", "desteklenmeyen işlem türü"),
     ("No module named", "modül bulunamadı"),
+    ("EOF when reading a line", "satır okunurken giriş verisi bitti"),
 )
 
 
@@ -163,12 +165,13 @@ def _build_error_message_tr(stderr: str) -> str:
     return _trim("\n".join(lines))
 
 
-def run_python(code: str) -> dict[str, str | bool]:
+def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
     try:
         completed = subprocess.run(
             [sys.executable, "-I", "-c", code],
             capture_output=True,
             text=True,
+            input=stdin_data,
             timeout=EXEC_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
@@ -285,10 +288,17 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             return
 
         code = payload.get("code", "")
+        stdin_data = payload.get("stdin", "")
         if not isinstance(code, str):
             self._send_json(
                 400,
                 {"ok": False, "output": "", "error": "`code` metin (string) olmalı."},
+            )
+            return
+        if not isinstance(stdin_data, str):
+            self._send_json(
+                400,
+                {"ok": False, "output": "", "error": "`stdin` metin (string) olmalı."},
             )
             return
 
@@ -298,7 +308,7 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             )
             return
 
-        self._send_json(200, run_python(code))
+        self._send_json(200, run_python(code, stdin_data=stdin_data))
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
