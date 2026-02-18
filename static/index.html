@@ -137,6 +137,10 @@
         padding: 8px 10px;
       }
 
+      .stdin-wrap[hidden] {
+        display: none;
+      }
+
       .stdin-wrap summary {
         cursor: pointer;
         font-size: 0.85rem;
@@ -412,16 +416,16 @@
       }
 
       @media (hover: none) and (pointer: coarse) {
-        #highlighting {
+        body.mobile-plain-edit #highlighting {
           display: none;
         }
 
-        #code {
+        body.mobile-plain-edit #code {
           color: var(--text);
           background: linear-gradient(180deg, #fffefb, #f8fbff);
         }
 
-        #code::selection {
+        body.mobile-plain-edit #code::selection {
           color: var(--text);
         }
       }
@@ -443,14 +447,6 @@
 print("Gökçe KIRCALI")
             </textarea>
           </div>
-          <details class="stdin-wrap">
-            <summary>input() için girdi (opsiyonel, boşsa 0 kabul edilir)</summary>
-            <textarea
-              id="stdin"
-              spellcheck="false"
-              placeholder="Her input() için bir satır gir.&#10;Örnek:&#10;12&#10;Ali"
-            ></textarea>
-          </details>
           <div class="actions">
             <button id="clear-code" type="button">Kodu Temizle</button>
             <button id="run" type="button">Çalıştır</button>
@@ -462,6 +458,14 @@ print("Gökçe KIRCALI")
         <h2>Çıktı</h2>
         <div class="output-body">
           <pre id="output">Sonuç burada görünecek.</pre>
+          <details id="stdin-wrap" class="stdin-wrap" hidden>
+            <summary>Veri girişi (input) - opsiyonel, boşsa 0 kabul edilir</summary>
+            <textarea
+              id="stdin"
+              spellcheck="false"
+              placeholder="Her input() için bir satır gir.&#10;Örnek:&#10;12&#10;Ali"
+            ></textarea>
+          </details>
           <div class="actions">
             <button id="clear-output" type="button">Temizle</button>
           </div>
@@ -471,6 +475,7 @@ print("Gökçe KIRCALI")
 
     <script>
       const codeInput = document.getElementById("code");
+      const stdinWrap = document.getElementById("stdin-wrap");
       const stdinInput = document.getElementById("stdin");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
@@ -478,6 +483,8 @@ print("Gökçe KIRCALI")
       const runButton = document.getElementById("run");
       const clearOutputButton = document.getElementById("clear-output");
       const output = document.getElementById("output");
+      const isCoarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      let hadInputCall = false;
 
       function escapeHtml(value) {
         return value
@@ -532,6 +539,15 @@ print("Gökçe KIRCALI")
         syncEditorScroll();
       }
 
+      function syncStdinVisibility() {
+        const hasInputCall = /\binput\s*\(/.test(codeInput.value);
+        stdinWrap.hidden = !hasInputCall;
+        if (hasInputCall && !hadInputCall) {
+          stdinWrap.open = true;
+        }
+        hadInputCall = hasInputCall;
+      }
+
       async function runCode() {
         const code = codeInput.value;
         runButton.disabled = true;
@@ -569,8 +585,20 @@ print("Gökçe KIRCALI")
       }
 
       runButton.addEventListener("click", runCode);
-      codeInput.addEventListener("input", renderHighlighting);
+      codeInput.addEventListener("input", () => {
+        renderHighlighting();
+        syncStdinVisibility();
+      });
       codeInput.addEventListener("scroll", syncEditorScroll);
+      if (isCoarsePointer) {
+        codeInput.addEventListener("focus", () => {
+          document.body.classList.add("mobile-plain-edit");
+        });
+        codeInput.addEventListener("blur", () => {
+          document.body.classList.remove("mobile-plain-edit");
+          renderHighlighting();
+        });
+      }
       codeInput.addEventListener("keydown", (event) => {
         if (event.key !== "Tab") return;
         event.preventDefault();
@@ -583,7 +611,9 @@ print("Gökçe KIRCALI")
       });
       clearCodeButton.addEventListener("click", () => {
         codeInput.value = "";
+        stdinInput.value = "";
         renderHighlighting();
+        syncStdinVisibility();
         codeInput.focus();
       });
       clearOutputButton.addEventListener("click", () => {
@@ -592,6 +622,7 @@ print("Gökçe KIRCALI")
       });
       codeInput.value = codeInput.value.replace(/^\n/, "").replace(/\n\s*$/, "");
       renderHighlighting();
+      syncStdinVisibility();
     </script>
   </body>
 </html>

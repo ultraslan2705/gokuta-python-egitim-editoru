@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from collections import defaultdict, deque
 import json
 import os
@@ -84,6 +85,36 @@ def _normalized_stdin(code: str, stdin_data: str) -> str:
         return (DEFAULT_INPUT_LINE + "\n") * max(1, DEFAULT_INPUT_LINES_COUNT)
 
     return ""
+
+
+def _extract_literal_input_prompts(code: str) -> list[str]:
+    prompts: list[str] = []
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return prompts
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "input":
+            continue
+        if not node.args:
+            continue
+
+        first_arg = node.args[0]
+        if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+            if first_arg.value:
+                prompts.append(first_arg.value)
+
+    return prompts
+
+
+def _strip_input_prompts_from_stdout(code: str, stdout: str) -> str:
+    cleaned = stdout
+    for prompt in _extract_literal_input_prompts(code):
+        cleaned = cleaned.replace(prompt, "")
+    return cleaned
 
 
 class SlidingWindowRateLimiter:
@@ -202,6 +233,7 @@ def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
         }
 
     stdout_raw = completed.stdout.strip()
+    stdout_raw = _strip_input_prompts_from_stdout(code, stdout_raw).strip()
     stderr_raw = completed.stderr.strip()
     stdout = _trim(stdout_raw)
 
