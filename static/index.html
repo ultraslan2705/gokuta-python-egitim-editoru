@@ -246,7 +246,8 @@
       }
 
       #run,
-      #clear-output {
+      #clear-output,
+      #clear-code {
         border: 1px solid transparent;
         border-radius: 12px;
         padding: 10px 17px;
@@ -269,13 +270,21 @@
         border-color: #d8e3ef;
       }
 
+      #clear-code {
+        color: #2b3f52;
+        background: #eef4fb;
+        border-color: #d8e3ef;
+      }
+
       #run:hover,
-      #clear-output:hover {
+      #clear-output:hover,
+      #clear-code:hover {
         transform: translateY(-1px);
       }
 
       #run:active,
-      #clear-output:active {
+      #clear-output:active,
+      #clear-code:active {
         transform: translateY(0);
       }
 
@@ -394,10 +403,26 @@
         }
 
         #run,
-        #clear-output {
+        #clear-output,
+        #clear-code {
           border-radius: 10px;
           padding: 6px 11px;
           font-size: 0.8rem;
+        }
+      }
+
+      @media (hover: none) and (pointer: coarse) {
+        #highlighting {
+          display: none;
+        }
+
+        #code {
+          color: var(--text);
+          background: linear-gradient(180deg, #fffefb, #f8fbff);
+        }
+
+        #code::selection {
+          color: var(--text);
         }
       }
     </style>
@@ -419,7 +444,7 @@ print("Gökçe KIRCALI")
             </textarea>
           </div>
           <details class="stdin-wrap">
-            <summary>input() için girdi (opsiyonel)</summary>
+            <summary>input() için girdi (opsiyonel, boşsa 0 kabul edilir)</summary>
             <textarea
               id="stdin"
               spellcheck="false"
@@ -427,6 +452,7 @@ print("Gökçe KIRCALI")
             ></textarea>
           </details>
           <div class="actions">
+            <button id="clear-code" type="button">Kodu Temizle</button>
             <button id="run" type="button">Çalıştır</button>
           </div>
         </div>
@@ -448,6 +474,7 @@ print("Gökçe KIRCALI")
       const stdinInput = document.getElementById("stdin");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
+      const clearCodeButton = document.getElementById("clear-code");
       const runButton = document.getElementById("run");
       const clearOutputButton = document.getElementById("clear-output");
       const output = document.getElementById("output");
@@ -553,6 +580,11 @@ print("Gökçe KIRCALI")
         codeInput.value = `${value.slice(0, start)}    ${value.slice(end)}`;
         codeInput.selectionStart = codeInput.selectionEnd = start + 4;
         renderHighlighting();
+      });
+      clearCodeButton.addEventListener("click", () => {
+        codeInput.value = "";
+        renderHighlighting();
+        codeInput.focus();
       });
       clearOutputButton.addEventListener("click", () => {
         output.classList.remove("error");

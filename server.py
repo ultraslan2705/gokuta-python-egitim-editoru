@@ -29,6 +29,8 @@ EXEC_TIMEOUT_SECONDS = 3
 MAX_OUTPUT_CHARS = 12_000
 RATE_LIMIT_WINDOW_SECONDS = _env_int("RATE_LIMIT_WINDOW_SECONDS", 60)
 RATE_LIMIT_MAX_REQUESTS = _env_int("RATE_LIMIT_MAX_REQUESTS", 120)
+DEFAULT_INPUT_LINE = os.getenv("DEFAULT_INPUT_LINE", "0")
+DEFAULT_INPUT_LINES_COUNT = _env_int("DEFAULT_INPUT_LINES_COUNT", 40)
 
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_FILE = BASE_DIR / "static" / "index.html"
@@ -72,6 +74,16 @@ def _trim(text: str) -> str:
     if len(text) <= MAX_OUTPUT_CHARS:
         return text
     return text[:MAX_OUTPUT_CHARS] + "\n\n... [çıktı kısaltıldı]"
+
+
+def _normalized_stdin(code: str, stdin_data: str) -> str:
+    if stdin_data != "":
+        return stdin_data
+
+    if re.search(r"\binput\s*\(", code):
+        return (DEFAULT_INPUT_LINE + "\n") * max(1, DEFAULT_INPUT_LINES_COUNT)
+
+    return ""
 
 
 class SlidingWindowRateLimiter:
@@ -166,12 +178,14 @@ def _build_error_message_tr(stderr: str) -> str:
 
 
 def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
+    stdin_value = _normalized_stdin(code, stdin_data)
+
     try:
         completed = subprocess.run(
             [sys.executable, "-I", "-c", code],
             capture_output=True,
             text=True,
-            input=stdin_data,
+            input=stdin_value,
             timeout=EXEC_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
