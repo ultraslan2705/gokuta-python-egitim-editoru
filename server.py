@@ -110,11 +110,24 @@ def _extract_literal_input_prompts(code: str) -> list[str]:
     return prompts
 
 
-def _strip_input_prompts_from_stdout(code: str, stdout: str) -> str:
-    cleaned = stdout
-    for prompt in _extract_literal_input_prompts(code):
-        cleaned = cleaned.replace(prompt, "")
-    return cleaned
+def _normalize_inline_input_prompts(code: str, stdout: str) -> str:
+    prompts = _extract_literal_input_prompts(code)
+    if not prompts or not stdout:
+        return stdout
+
+    normalized = stdout
+    search_from = 0
+    for prompt in prompts:
+        idx = normalized.find(prompt, search_from)
+        if idx == -1:
+            continue
+        after = idx + len(prompt)
+        if after < len(normalized) and normalized[after] not in ("\n", "\r"):
+            normalized = normalized[:after] + "\n" + normalized[after:]
+            search_from = after + 1
+        else:
+            search_from = after
+    return normalized
 
 
 class SlidingWindowRateLimiter:
@@ -233,7 +246,7 @@ def run_python(code: str, stdin_data: str = "") -> dict[str, str | bool]:
         }
 
     stdout_raw = completed.stdout.strip()
-    stdout_raw = _strip_input_prompts_from_stdout(code, stdout_raw).strip()
+    stdout_raw = _normalize_inline_input_prompts(code, stdout_raw).strip()
     stderr_raw = completed.stderr.strip()
     stdout = _trim(stdout_raw)
 

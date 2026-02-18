@@ -135,29 +135,31 @@
         border-radius: 10px;
         background: #f8fbff;
         padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .stdin-wrap[hidden] {
         display: none;
       }
 
-      .stdin-wrap summary {
-        cursor: pointer;
-        font-size: 0.85rem;
+      .stdin-label {
+        font-size: 0.82rem;
         font-weight: 700;
         color: #2a4a63;
+        white-space: nowrap;
       }
 
       #stdin {
         width: 100%;
-        min-height: 66px;
-        margin-top: 8px;
+        height: 38px;
         border: 1px solid #d2deec;
         border-radius: 10px;
-        padding: 8px 10px;
-        resize: vertical;
+        padding: 0 10px;
+        resize: none;
         font-family: "Courier New", Courier, monospace;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         background: #ffffff;
       }
 
@@ -390,15 +392,13 @@
           padding: 6px 8px;
         }
 
-        .stdin-wrap summary {
-          font-size: 0.76rem;
+        .stdin-label {
+          font-size: 0.74rem;
         }
 
         #stdin {
-          min-height: 52px;
-          max-height: 84px;
-          margin-top: 6px;
-          padding: 6px 8px;
+          height: 32px;
+          padding: 0 8px;
           font-size: 0.8rem;
         }
 
@@ -458,14 +458,10 @@ print("Gökçe KIRCALI")
         <h2>Çıktı</h2>
         <div class="output-body">
           <pre id="output">Sonuç burada görünecek.</pre>
-          <details id="stdin-wrap" class="stdin-wrap" hidden>
-            <summary>Veri girişi (input) - opsiyonel, boşsa 0 kabul edilir</summary>
-            <textarea
-              id="stdin"
-              spellcheck="false"
-              placeholder="Her input() için bir satır gir.&#10;Örnek:&#10;12&#10;Ali"
-            ></textarea>
-          </details>
+          <div id="stdin-wrap" class="stdin-wrap" hidden>
+            <label class="stdin-label" for="stdin">Veri girişi</label>
+            <input id="stdin" type="text" spellcheck="false" placeholder="0" />
+          </div>
           <div class="actions">
             <button id="clear-output" type="button">Temizle</button>
           </div>
@@ -484,7 +480,6 @@ print("Gökçe KIRCALI")
       const clearOutputButton = document.getElementById("clear-output");
       const output = document.getElementById("output");
       const isCoarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-      let hadInputCall = false;
 
       function escapeHtml(value) {
         return value
@@ -542,10 +537,6 @@ print("Gökçe KIRCALI")
       function syncStdinVisibility() {
         const hasInputCall = /\binput\s*\(/.test(codeInput.value);
         stdinWrap.hidden = !hasInputCall;
-        if (hasInputCall && !hadInputCall) {
-          stdinWrap.open = true;
-        }
-        hadInputCall = hasInputCall;
       }
 
       async function runCode() {
@@ -555,10 +546,11 @@ print("Gökçe KIRCALI")
         output.textContent = "Kod çalıştırılıyor...";
 
         try {
+          const stdinValue = stdinInput.value.trim();
           const response = await fetch("/run", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, stdin: stdinInput.value }),
+            body: JSON.stringify({ code, stdin: stdinValue ? `${stdinValue}\n` : "" }),
           });
 
           const data = await response.json();
