@@ -478,25 +478,25 @@
 
         .app-header {
           width: calc(100% - 24px);
-          padding: 10px 0 4px;
+          padding: 16px 0 4px;
         }
 
         .app-kicker {
-          margin-bottom: 4px;
-          font-size: 0.62rem;
-          letter-spacing: 0.1em;
+          margin-bottom: 3px;
+          font-size: 0.6rem;
+          letter-spacing: 0.09em;
         }
 
         .app-title {
-          font-size: clamp(1.16rem, 6vw, 1.42rem);
+          font-size: clamp(1.14rem, 5.7vw, 1.4rem);
         }
 
         .layout {
           width: calc(100% - 24px);
-          margin: 0 auto 8px auto;
-          min-height: calc(100dvh - 82px);
-          height: calc(100dvh - 82px);
-          grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+          margin: 0 auto 4px auto;
+          min-height: calc(100dvh - 74px);
+          height: calc(100dvh - 74px);
+          grid-template-rows: minmax(0, 1.16fr) minmax(0, 0.84fr);
           gap: 8px;
         }
 
@@ -531,6 +531,11 @@
         .code-editor,
         #output {
           min-height: 0;
+        }
+
+        .editor-body,
+        .output-body {
+          gap: 8px;
         }
 
         #code,
