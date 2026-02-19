@@ -130,6 +130,23 @@
         line-height: 1.4;
       }
 
+      .example-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+
+      .example-btn {
+        border: 1px solid #d1deeb;
+        background: #f2f8ff;
+        color: #1f3f57;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
       #code {
         position: absolute;
         inset: 0;
@@ -288,6 +305,33 @@
         border-color: #efc6c6;
       }
 
+      .help-card {
+        border: 1px solid #ffd8a8;
+        background: #fff8ec;
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+
+      .help-card[hidden] {
+        display: none;
+      }
+
+      .help-title {
+        margin: 0 0 6px 0;
+        font-size: 0.95rem;
+        color: #6a3b00;
+      }
+
+      .help-line {
+        margin: 0;
+        font-size: 0.88rem;
+        line-height: 1.35;
+      }
+
+      .help-line + .help-line {
+        margin-top: 5px;
+      }
+
       @keyframes rise-in {
         from {
           opacity: 0;
@@ -343,6 +387,15 @@
           line-height: 1.3;
         }
 
+        .example-strip {
+          gap: 5px;
+        }
+
+        .example-btn {
+          padding: 4px 8px;
+          font-size: 0.7rem;
+        }
+
         .code-editor,
         #output {
           min-height: 0;
@@ -365,6 +418,18 @@
           border-radius: 10px;
           padding: 6px 11px;
           font-size: 0.8rem;
+        }
+
+        .help-card {
+          padding: 8px 9px;
+        }
+
+        .help-title {
+          font-size: 0.83rem;
+        }
+
+        .help-line {
+          font-size: 0.77rem;
         }
       }
 
@@ -393,6 +458,7 @@
       <section class="panel editor-panel">
         <h2>Python Kod Alanı</h2>
         <p class="hint">Yukarıdaki alana kod yazıp aşağıdaki butonla çalıştırabilirsin.</p>
+        <div id="example-strip" class="example-strip"></div>
         <div class="editor-body">
           <div class="code-editor">
             <pre id="highlighting" aria-hidden="true"><code id="highlighting-content"></code></pre>
@@ -411,6 +477,12 @@ print("Gökçe KIRCALI")
         <h2>Çıktı</h2>
         <div class="output-body">
           <pre id="output">Sonuç burada görünecek.</pre>
+          <section id="help-card" class="help-card" hidden>
+            <h3 id="help-title" class="help-title">Öğretici İpucu</h3>
+            <p class="help-line"><strong>Neden:</strong> <span id="help-why"></span></p>
+            <p class="help-line"><strong>Çözüm:</strong> <span id="help-fix"></span></p>
+            <p class="help-line"><strong>Mini Örnek:</strong> <span id="help-example"></span></p>
+          </section>
           <div class="actions">
             <button id="clear-output" type="button">Temizle</button>
           </div>
@@ -422,11 +494,47 @@ print("Gökçe KIRCALI")
       const codeInput = document.getElementById("code");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
+      const exampleStrip = document.getElementById("example-strip");
       const clearCodeButton = document.getElementById("clear-code");
       const runButton = document.getElementById("run");
       const clearOutputButton = document.getElementById("clear-output");
       const output = document.getElementById("output");
+      const helpCard = document.getElementById("help-card");
+      const helpTitle = document.getElementById("help-title");
+      const helpWhy = document.getElementById("help-why");
+      const helpFix = document.getElementById("help-fix");
+      const helpExample = document.getElementById("help-example");
       const isCoarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      const EXAMPLES = [
+        {
+          label: "Değişken",
+          code: 'ad = "Ahmet"\nyas = 15\nprint(ad, yas)',
+        },
+        {
+          label: "Input",
+          code: 'sayi = int(input("Bir sayı giriniz : "))\nprint(sayi)',
+        },
+        {
+          label: "if-else",
+          code: 'notu = int(input("Not giriniz : "))\nif notu >= 50:\n    print("Geçti")\nelse:\n    print("Kaldı")',
+        },
+        {
+          label: "for",
+          code: "for i in range(1, 6):\n    print(i)",
+        },
+        {
+          label: "while",
+          code: "sayac = 1\nwhile sayac <= 5:\n    print(sayac)\n    sayac += 1",
+        },
+        {
+          label: "Liste",
+          code: 'meyveler = ["elma", "armut", "muz"]\nfor meyve in meyveler:\n    print(meyve)',
+        },
+        {
+          label: "Fonksiyon",
+          code: "def kare(sayi):\n    return sayi * sayi\n\nprint(kare(6))",
+        },
+      ];
 
       function escapeHtml(value) {
         return value
@@ -481,6 +589,42 @@ print("Gökçe KIRCALI")
         syncEditorScroll();
       }
 
+      function hideHelpCard() {
+        helpCard.hidden = true;
+      }
+
+      function showHelpCard(help, errorType) {
+        if (!help) {
+          hideHelpCard();
+          return;
+        }
+        helpTitle.textContent = `Öğretici İpucu (${errorType || "Hata"})`;
+        helpWhy.textContent = help.why || "Hatanın nedeni bulunamadı.";
+        helpFix.textContent = help.fix || "Kodu adım adım kontrol et.";
+        helpExample.textContent = help.example || "print(\"Merhaba\")";
+        helpCard.hidden = false;
+      }
+
+      function loadExample(exampleCode) {
+        codeInput.value = exampleCode;
+        hideHelpCard();
+        output.classList.remove("error");
+        output.textContent = "Sonuç burada görünecek.";
+        renderHighlighting();
+        codeInput.focus();
+      }
+
+      function renderExampleButtons() {
+        for (const item of EXAMPLES) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "example-btn";
+          btn.textContent = item.label;
+          btn.addEventListener("click", () => loadExample(item.code));
+          exampleStrip.appendChild(btn);
+        }
+      }
+
       function extractInputPrompts(source) {
         const prompts = [];
         const regex = /\binput\s*\(\s*(?:(["'])(.*?)\1)?\s*\)/g;
@@ -496,7 +640,7 @@ print("Gökçe KIRCALI")
         if (prompts.length === 0) return "";
         const values = [];
         for (const prompt of prompts) {
-          const answer = window.prompt(prompt, "0");
+          const answer = window.prompt(prompt, "");
           if (answer === null) return null;
           values.push(answer.trim() === "" ? "0" : answer);
         }
@@ -506,6 +650,7 @@ print("Gökçe KIRCALI")
       async function runCode() {
         const code = codeInput.value;
         runButton.disabled = true;
+        hideHelpCard();
         output.classList.remove("error");
         output.textContent = "Kod çalıştırılıyor...";
 
@@ -530,16 +675,19 @@ print("Gökçe KIRCALI")
           if (data.ok) {
             output.classList.remove("error");
             output.textContent = data.output;
+            hideHelpCard();
           } else {
             output.classList.add("error");
             const lines = [];
             if (data.output) lines.push(data.output);
             if (data.error) lines.push(data.error);
             output.textContent = lines.join("\n\n") || "Bir hata oluştu.";
+            showHelpCard(data.help, data.error_type);
           }
         } catch (error) {
           output.classList.add("error");
           output.textContent = `Hata: ${error.message}`;
+          showHelpCard(null, "");
         } finally {
           runButton.disabled = false;
         }
@@ -571,14 +719,17 @@ print("Gökçe KIRCALI")
       });
       clearCodeButton.addEventListener("click", () => {
         codeInput.value = "";
+        hideHelpCard();
         renderHighlighting();
         codeInput.focus();
       });
       clearOutputButton.addEventListener("click", () => {
+        hideHelpCard();
         output.classList.remove("error");
         output.textContent = "Sonuç burada görünecek.";
       });
       codeInput.value = codeInput.value.replace(/^\n/, "").replace(/\n\s*$/, "");
+      renderExampleButtons();
       renderHighlighting();
     </script>
   </body>

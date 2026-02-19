@@ -51,6 +51,54 @@ ERROR_HINTS_TR = {
     "EOFError": "input() verisi eksik görünüyor. Girdi kutusuna satır ekleyip tekrar dene.",
 }
 
+ERROR_HELP_TR: dict[str, dict[str, str]] = {
+    "SyntaxError": {
+        "why": "Kodun söz dizimi Python kurallarına uymuyor.",
+        "fix": "Parantez, tırnak ve iki nokta üst üste (:) kullanımını kontrol et.",
+        "example": "if sayi > 5:\n    print(sayi)",
+    },
+    "NameError": {
+        "why": "Kullanılan değişken veya isim daha önce tanımlanmamış.",
+        "fix": "Önce değişkeni oluştur, sonra kullan.",
+        "example": "ad = \"Ali\"\nprint(ad)",
+    },
+    "TypeError": {
+        "why": "Uyumsuz türlerde veriyle işlem yapılmış.",
+        "fix": "İşlem öncesi gerekirse int(), str() gibi dönüşüm yap.",
+        "example": "yas = int(\"15\")\nprint(yas + 1)",
+    },
+    "ValueError": {
+        "why": "Fonksiyon doğru türde ama uygun olmayan değer aldı.",
+        "fix": "input ile gelen verinin beklenen formatta olduğundan emin ol.",
+        "example": "sayi = int(input(\"Sayı: \"))",
+    },
+    "IndentationError": {
+        "why": "Girinti blok yapısı bozulmuş.",
+        "fix": "Aynı bloktaki satırları eşit boşlukla başlat (genelde 4 boşluk).",
+        "example": "for i in range(3):\n    print(i)",
+    },
+    "ZeroDivisionError": {
+        "why": "Bir sayı 0'a bölünmeye çalışılmış.",
+        "fix": "Bölenin 0 olmadığını kontrol et.",
+        "example": "if b != 0:\n    print(a / b)",
+    },
+    "IndexError": {
+        "why": "Listenin olmayan bir indeksine erişilmiş.",
+        "fix": "İndeksin liste uzunluğundan küçük olduğuna bak.",
+        "example": "if i < len(liste):\n    print(liste[i])",
+    },
+    "KeyError": {
+        "why": "Sözlükte olmayan anahtara erişilmiş.",
+        "fix": "Anahtar var mı kontrol et veya get() kullan.",
+        "example": "deger = sozluk.get(\"ad\", \"yok\")",
+    },
+    "EOFError": {
+        "why": "input() bir değer beklerken veri gelmedi.",
+        "fix": "İstendiğinde bir değer gir ya da varsayılan değer kullan.",
+        "example": "ad = input(\"Adın: \") or \"Misafir\"",
+    },
+}
+
 DETAIL_PHRASES_TR = (
     ("invalid syntax", "geçersiz söz dizimi"),
     ("unexpected EOF while parsing", "kod beklenmeden bitti (parantez/tırnak eksik olabilir)"),
@@ -228,9 +276,19 @@ def _build_error_message_tr(stderr: str) -> str:
     return _trim("\n".join(lines))
 
 
+def _build_error_help_tr(exc_type: str | None) -> dict[str, str]:
+    if exc_type and exc_type in ERROR_HELP_TR:
+        return ERROR_HELP_TR[exc_type]
+    return {
+        "why": "Kod çalışırken beklenmeyen bir hata oluştu.",
+        "fix": "Kodunu adım adım kontrol edip tekrar çalıştır.",
+        "example": "print(\"Merhaba\")",
+    }
+
+
 def run_python(
     code: str, stdin_data: str = "", strip_input_prompts: bool = False
-) -> dict[str, str | bool]:
+) -> dict[str, object]:
     stdin_value = _normalized_stdin(code, stdin_data)
 
     try:
@@ -242,16 +300,25 @@ def run_python(
             timeout=EXEC_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
+        error_text = "Kod zaman aşımına uğradı (3 saniye). Sonsuz döngü olabilir."
         return {
             "ok": False,
             "output": "",
-            "error": "Kod zaman aşımına uğradı (3 saniye). Sonsuz döngü olabilir.",
+            "error": error_text,
+            "error_type": "Timeout",
+            "help": {
+                "why": "Kod izin verilen sürede tamamlanmadı.",
+                "fix": "Sonsuz döngü olup olmadığını kontrol et ve döngüye durma koşulu ekle.",
+                "example": "while sayac < 10:\n    sayac += 1",
+            },
         }
     except Exception as exc:  # pragma: no cover
         return {
             "ok": False,
             "output": "",
             "error": f"Beklenmeyen bir hata oluştu: {exc}",
+            "error_type": "RuntimeError",
+            "help": _build_error_help_tr(None),
         }
 
     stdout_raw = completed.stdout.strip()
@@ -269,10 +336,13 @@ def run_python(
             "error": "",
         }
 
+    exc_type, _ = _extract_exception_info(stderr_raw)
     return {
         "ok": False,
         "output": stdout,
         "error": _build_error_message_tr(stderr_raw),
+        "error_type": exc_type or "Hata",
+        "help": _build_error_help_tr(exc_type),
     }
 
 
@@ -280,7 +350,7 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
     def _send_json(
         self,
         status: int,
-        payload: dict[str, str | bool],
+        payload: dict[str, object],
         extra_headers: dict[str, str] | None = None,
     ) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
