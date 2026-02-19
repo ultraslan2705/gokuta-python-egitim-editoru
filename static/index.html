@@ -29,6 +29,7 @@
         min-height: 100vh;
         font-family: "Avenir Next", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
         color: var(--text);
+        overflow: hidden;
         background:
           radial-gradient(circle at 8% 6%, #fff7dc 0%, transparent 42%),
           radial-gradient(circle at 92% 4%, #d7f0ff 0%, transparent 46%),
@@ -52,7 +53,7 @@
       .app-header {
         width: min(1100px, calc(100% - 28px));
         margin: 0 auto;
-        padding: 18px 0 8px;
+        padding: 12px 0 6px;
         text-align: center;
         position: relative;
       }
@@ -77,11 +78,11 @@
 
       .layout {
         width: min(1100px, calc(100% - 28px));
-        margin: 0 auto 16px auto;
-        min-height: calc(100vh - 132px);
-        min-height: calc(100dvh - 132px);
+        margin: 0 auto 10px auto;
+        height: calc(100dvh - 102px);
+        min-height: 0;
         display: grid;
-        grid-template-rows: minmax(320px, 1fr) minmax(250px, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
         gap: 14px;
         position: relative;
       }
@@ -177,7 +178,7 @@
       .code-editor {
         position: relative;
         flex: 1;
-        min-height: 200px;
+        min-height: 0;
       }
 
       #highlighting {
@@ -287,7 +288,7 @@
       #output {
         margin: 0;
         height: auto;
-        min-height: 180px;
+        min-height: 0;
         flex: 1;
         overflow: auto;
         padding: 12px;
@@ -344,10 +345,6 @@
       }
 
       @media (max-width: 760px) {
-        body {
-          overflow: hidden;
-        }
-
         .app-header {
           width: calc(100% - 24px);
           padding: 10px 0 4px;
@@ -511,6 +508,14 @@ print("Gökçe KIRCALI")
           code: 'ad = "Ahmet"\nyas = 15\nprint(ad, yas)',
         },
         {
+          label: "Print",
+          code: 'print("Merhaba Dünya")',
+        },
+        {
+          label: "Formatlı Yazım",
+          code: 'ad = "Ahmet"\nyas = 15\nprint(f"Adınız {ad}, yaşınız {yas}")',
+        },
+        {
           label: "Input",
           code: 'sayi = int(input("Bir sayı giriniz : "))\nprint(sayi)',
         },
@@ -525,10 +530,6 @@ print("Gökçe KIRCALI")
         {
           label: "while",
           code: "sayac = 1\nwhile sayac <= 5:\n    print(sayac)\n    sayac += 1",
-        },
-        {
-          label: "Formatlı Yazım",
-          code: 'ad = "Ahmet"\nyas = 15\nprint(f"Adınız {ad}, yaşınız {yas}")',
         },
         {
           label: "Collections",
