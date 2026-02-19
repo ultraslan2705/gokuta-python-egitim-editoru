@@ -18,6 +18,7 @@
         --error: #a32020;
         --border: #c8d7e6;
         --shadow: 0 20px 45px rgba(10, 30, 50, 0.12);
+        --gutter-width: 44px;
       }
 
       * {
@@ -156,7 +157,7 @@
         height: 100%;
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 12px;
+        padding: 12px 12px 12px calc(var(--gutter-width) + 10px);
         font-family: "Courier New", Courier, monospace;
         font-size: 0.98rem;
         line-height: 1.5;
@@ -189,7 +190,7 @@
         height: 100%;
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 12px;
+        padding: 12px 12px 12px calc(var(--gutter-width) + 10px);
         overflow: auto;
         pointer-events: none;
         white-space: pre;
@@ -205,6 +206,51 @@
         font-size: 0.98rem;
         line-height: 1.5;
         color: var(--text);
+      }
+
+      #line-numbers {
+        position: absolute;
+        top: 1px;
+        bottom: 1px;
+        left: 1px;
+        width: var(--gutter-width);
+        border-right: 1px solid #d8e5f2;
+        border-radius: 11px 0 0 11px;
+        background: #f4f9ff;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      #line-numbers-content {
+        padding: 12px 8px 12px 0;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #7a8da1;
+        text-align: right;
+        white-space: pre;
+      }
+
+      .line-number {
+        display: block;
+      }
+
+      .line-number.active {
+        color: #0a6f87;
+        font-weight: 700;
+      }
+
+      #active-line {
+        position: absolute;
+        left: calc(var(--gutter-width) + 2px);
+        right: 2px;
+        height: 0;
+        border-radius: 6px;
+        background: rgba(10, 111, 135, 0.12);
+        pointer-events: none;
+        z-index: 1;
+        display: none;
       }
 
       .token-keyword {
@@ -238,7 +284,8 @@
 
       #run,
       #clear-output,
-      #clear-code {
+      #clear-code,
+      #reset-all {
         border: 1px solid transparent;
         border-radius: 12px;
         padding: 10px 17px;
@@ -267,15 +314,23 @@
         border-color: #d8e3ef;
       }
 
+      #reset-all {
+        color: #5e4300;
+        background: #fff4dc;
+        border-color: #ecd4a5;
+      }
+
       #run:hover,
       #clear-output:hover,
-      #clear-code:hover {
+      #clear-code:hover,
+      #reset-all:hover {
         transform: translateY(-1px);
       }
 
       #run:active,
       #clear-output:active,
-      #clear-code:active {
+      #clear-code:active,
+      #reset-all:active {
         transform: translateY(0);
       }
 
@@ -331,6 +386,71 @@
 
       .help-line + .help-line {
         margin-top: 5px;
+      }
+
+      .input-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 20, 30, 0.46);
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        z-index: 30;
+      }
+
+      .input-modal[hidden] {
+        display: none;
+      }
+
+      .input-modal-card {
+        width: min(440px, 96vw);
+        background: #fffefb;
+        border: 1px solid #d7e3ef;
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 24px 60px rgba(4, 18, 28, 0.32);
+      }
+
+      .input-modal-title {
+        margin: 0 0 10px 0;
+        font-size: 1rem;
+        color: #173952;
+      }
+
+      #input-modal-field {
+        width: 100%;
+        border: 1px solid #c7d8e8;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 0.95rem;
+      }
+
+      .input-modal-actions {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      #input-cancel,
+      #input-ok {
+        border-radius: 10px;
+        border: 1px solid transparent;
+        padding: 7px 12px;
+        font-size: 0.86rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #input-cancel {
+        background: #eef4fb;
+        border-color: #d5e1ee;
+        color: #2a3f53;
+      }
+
+      #input-ok {
+        background: linear-gradient(140deg, var(--accent), var(--accent-strong));
+        color: #ffffff;
       }
 
       @keyframes rise-in {
@@ -399,10 +519,19 @@
         }
 
         #code,
-        #highlighting,
+        #highlighting {
+          padding: 9px 9px 9px calc(var(--gutter-width) + 8px);
+          font-size: 0.84rem;
+        }
+
         #output {
           padding: 9px;
           font-size: 0.84rem;
+        }
+
+        #line-numbers-content {
+          padding: 9px 6px 9px 0;
+          font-size: 0.72rem;
         }
 
         .actions {
@@ -411,7 +540,8 @@
 
         #run,
         #clear-output,
-        #clear-code {
+        #clear-code,
+        #reset-all {
           border-radius: 10px;
           padding: 6px 11px;
           font-size: 0.8rem;
@@ -428,9 +558,33 @@
         .help-line {
           font-size: 0.77rem;
         }
+
+        .input-modal-card {
+          width: min(420px, 100%);
+          padding: 11px;
+        }
+
+        .input-modal-title {
+          font-size: 0.9rem;
+        }
+
+        #input-modal-field {
+          font-size: 0.85rem;
+          padding: 8px 10px;
+        }
+
+        #input-cancel,
+        #input-ok {
+          padding: 6px 10px;
+          font-size: 0.8rem;
+        }
       }
 
       @media (hover: none) and (pointer: coarse) {
+        :root {
+          --gutter-width: 34px;
+        }
+
         body.mobile-plain-edit #highlighting {
           display: none;
         }
@@ -442,6 +596,10 @@
 
         body.mobile-plain-edit #code::selection {
           color: var(--text);
+        }
+
+        body.mobile-plain-edit #line-numbers {
+          opacity: 0.85;
         }
       }
     </style>
@@ -458,6 +616,8 @@
         <div id="example-strip" class="example-strip"></div>
         <div class="editor-body">
           <div class="code-editor">
+            <div id="active-line"></div>
+            <div id="line-numbers" aria-hidden="true"><div id="line-numbers-content"></div></div>
             <pre id="highlighting" aria-hidden="true"><code id="highlighting-content"></code></pre>
             <textarea id="code" spellcheck="false">
 print("Gökçe KIRCALI")
@@ -465,6 +625,7 @@ print("Gökçe KIRCALI")
           </div>
           <div class="actions">
             <button id="clear-code" type="button">Kodu Temizle</button>
+            <button id="reset-all" type="button">Sıfırla</button>
             <button id="run" type="button">Çalıştır</button>
           </div>
         </div>
@@ -487,12 +648,26 @@ print("Gökçe KIRCALI")
       </section>
     </main>
 
+    <section id="input-modal" class="input-modal" hidden>
+      <div class="input-modal-card">
+        <p id="input-modal-title" class="input-modal-title">Bir değer giriniz:</p>
+        <input id="input-modal-field" type="text" spellcheck="false" />
+        <div class="input-modal-actions">
+          <button id="input-cancel" type="button">İptal</button>
+          <button id="input-ok" type="button">Tamam</button>
+        </div>
+      </div>
+    </section>
+
     <script>
       const codeInput = document.getElementById("code");
+      const lineNumbersContent = document.getElementById("line-numbers-content");
+      const activeLine = document.getElementById("active-line");
       const highlighting = document.getElementById("highlighting");
       const highlightingContent = document.getElementById("highlighting-content");
       const exampleStrip = document.getElementById("example-strip");
       const clearCodeButton = document.getElementById("clear-code");
+      const resetAllButton = document.getElementById("reset-all");
       const runButton = document.getElementById("run");
       const clearOutputButton = document.getElementById("clear-output");
       const output = document.getElementById("output");
@@ -501,7 +676,14 @@ print("Gökçe KIRCALI")
       const helpWhy = document.getElementById("help-why");
       const helpFix = document.getElementById("help-fix");
       const helpExample = document.getElementById("help-example");
+      const inputModal = document.getElementById("input-modal");
+      const inputModalTitle = document.getElementById("input-modal-title");
+      const inputModalField = document.getElementById("input-modal-field");
+      const inputOkButton = document.getElementById("input-ok");
+      const inputCancelButton = document.getElementById("input-cancel");
       const isCoarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+      let defaultCode = "";
+      let inputResolver = null;
       const EXAMPLES = [
         {
           label: "Değişken",
@@ -587,11 +769,45 @@ print("Gökçe KIRCALI")
       function syncEditorScroll() {
         highlighting.scrollTop = codeInput.scrollTop;
         highlighting.scrollLeft = codeInput.scrollLeft;
+        lineNumbersContent.style.transform = `translateY(${-codeInput.scrollTop}px)`;
       }
 
       function renderHighlighting() {
         highlightingContent.innerHTML = highlightPythonCode(codeInput.value);
         syncEditorScroll();
+      }
+
+      function currentLineNumber() {
+        return codeInput.value.slice(0, codeInput.selectionStart).split("\n").length;
+      }
+
+      function renderLineNumbers() {
+        const totalLines = codeInput.value.split("\n").length;
+        const active = currentLineNumber();
+        const rows = [];
+        for (let i = 1; i <= totalLines; i += 1) {
+          rows.push(`<span class="line-number${i === active ? " active" : ""}">${i}</span>`);
+        }
+        lineNumbersContent.innerHTML = rows.join("");
+        lineNumbersContent.style.transform = `translateY(${-codeInput.scrollTop}px)`;
+      }
+
+      function updateActiveLineMarker() {
+        const lineHeight = parseFloat(getComputedStyle(codeInput).lineHeight) || 22;
+        const paddingTop = parseFloat(getComputedStyle(codeInput).paddingTop) || 0;
+        const top = paddingTop + (currentLineNumber() - 1) * lineHeight - codeInput.scrollTop;
+        if (top + lineHeight < 0 || top > codeInput.clientHeight) {
+          activeLine.style.display = "none";
+          return;
+        }
+        activeLine.style.display = "block";
+        activeLine.style.top = `${Math.max(1, top)}px`;
+        activeLine.style.height = `${lineHeight}px`;
+      }
+
+      function refreshEditorMeta() {
+        renderLineNumbers();
+        updateActiveLineMarker();
       }
 
       function hideHelpCard() {
@@ -630,6 +846,27 @@ print("Gökçe KIRCALI")
         }
       }
 
+      function closeInputModal(value) {
+        if (!inputResolver) return;
+        inputModal.hidden = true;
+        const resolver = inputResolver;
+        inputResolver = null;
+        resolver(value);
+      }
+
+      function askInputValue(promptText) {
+        return new Promise((resolve) => {
+          inputResolver = resolve;
+          inputModalTitle.textContent = promptText || "Bir değer giriniz:";
+          inputModalField.value = "";
+          inputModal.hidden = false;
+          window.setTimeout(() => {
+            inputModalField.focus();
+            inputModalField.select();
+          }, 0);
+        });
+      }
+
       function extractInputPrompts(source) {
         const prompts = [];
         const regex = /\binput\s*\(\s*(?:(["'])(.*?)\1)?\s*\)/g;
@@ -641,11 +878,11 @@ print("Gökçe KIRCALI")
         return prompts;
       }
 
-      function collectStdinFromPrompts(prompts) {
+      async function collectStdinFromPrompts(prompts) {
         if (prompts.length === 0) return "";
         const values = [];
         for (const prompt of prompts) {
-          const answer = window.prompt(prompt, "");
+          const answer = await askInputValue(prompt);
           if (answer === null) return null;
           values.push(answer.trim() === "" ? "0" : answer);
         }
@@ -661,7 +898,7 @@ print("Gökçe KIRCALI")
 
         try {
           const prompts = extractInputPrompts(code);
-          const stdin = collectStdinFromPrompts(prompts);
+          const stdin = await collectStdinFromPrompts(prompts);
           if (stdin === null) {
             output.textContent = "Çalıştırma iptal edildi.";
             return;
@@ -701,15 +938,24 @@ print("Gökçe KIRCALI")
       runButton.addEventListener("click", runCode);
       codeInput.addEventListener("input", () => {
         renderHighlighting();
+        refreshEditorMeta();
       });
-      codeInput.addEventListener("scroll", syncEditorScroll);
+      codeInput.addEventListener("scroll", () => {
+        syncEditorScroll();
+        updateActiveLineMarker();
+      });
+      codeInput.addEventListener("click", refreshEditorMeta);
+      codeInput.addEventListener("keyup", refreshEditorMeta);
+      codeInput.addEventListener("select", refreshEditorMeta);
       if (isCoarsePointer) {
         codeInput.addEventListener("focus", () => {
           document.body.classList.add("mobile-plain-edit");
+          refreshEditorMeta();
         });
         codeInput.addEventListener("blur", () => {
           document.body.classList.remove("mobile-plain-edit");
           renderHighlighting();
+          refreshEditorMeta();
         });
       }
       codeInput.addEventListener("keydown", (event) => {
@@ -721,11 +967,22 @@ print("Gökçe KIRCALI")
         codeInput.value = `${value.slice(0, start)}    ${value.slice(end)}`;
         codeInput.selectionStart = codeInput.selectionEnd = start + 4;
         renderHighlighting();
+        refreshEditorMeta();
       });
       clearCodeButton.addEventListener("click", () => {
         codeInput.value = "";
         hideHelpCard();
         renderHighlighting();
+        refreshEditorMeta();
+        codeInput.focus();
+      });
+      resetAllButton.addEventListener("click", () => {
+        codeInput.value = defaultCode;
+        hideHelpCard();
+        output.classList.remove("error");
+        output.textContent = "Sonuç burada görünecek.";
+        renderHighlighting();
+        refreshEditorMeta();
         codeInput.focus();
       });
       clearOutputButton.addEventListener("click", () => {
@@ -733,9 +990,25 @@ print("Gökçe KIRCALI")
         output.classList.remove("error");
         output.textContent = "Sonuç burada görünecek.";
       });
+      inputOkButton.addEventListener("click", () => closeInputModal(inputModalField.value));
+      inputCancelButton.addEventListener("click", () => closeInputModal(null));
+      inputModalField.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          closeInputModal(inputModalField.value);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          closeInputModal(null);
+        }
+      });
+      inputModal.addEventListener("click", (event) => {
+        if (event.target === inputModal) closeInputModal(null);
+      });
       codeInput.value = codeInput.value.replace(/^\n/, "").replace(/\n\s*$/, "");
+      defaultCode = codeInput.value;
       renderExampleButtons();
       renderHighlighting();
+      refreshEditorMeta();
     </script>
   </body>
 </html>
